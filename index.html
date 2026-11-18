@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>USDT 收款</title>
+<script src="https://cdn.jsdelivr.net/npm/tronweb/dist/TronWeb.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f6f9;
+  margin: 0;
+  padding: 25px;
+  text-align: center;
+}
+.container {
+  max-width: 420px;
+  margin: 30px auto;
+  padding: 25px;
+  background: white;
+  border-radius: 16px;
+}
+button {
+  width: 100%;
+  padding: 14px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 9px;
+  background: #1677ff;
+  color: white;
+  font-size: 16px;
+}
+button:disabled { opacity: .5; }
+.address {
+  font-size: 12px;
+  word-break: break-all;
+  background: #f1f3f5;
+  padding: 10px;
+  border-radius: 8px;
+}
+#qrcode {
+  display: flex;
+  justify-content: center;
+  margin: 20px;
+}
+#status {
+  margin-top: 15px;
+  font-size: 13px;
+  word-break: break-all;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+  <h2>USDT 收款</h2>
+  <h1>0.1 USDT</h1>
+
+  <div id="qrcode"></div>
+  <p>扫码打开本收款页面</p>
+
+  <button onclick="connectWallet()">连接钱包</button>
+
+  <p>当前钱包</p>
+  <div class="address" id="wallet">尚未连接</div>
+
+  <p>收款地址</p>
+  <div class="address" id="recipient"></div>
+
+  <button id="approveBtn" onclick="approveUSDT()">
+    第一步：授权 0.1 USDT
+  </button>
+
+  <button id="transferBtn" onclick="transferUSDT()">
+    第二步：转账 0.1 USDT
+  </button>
+
+  <div id="status">请先连接钱包</div>
+</div>
+
+<script>
+// ===== 页面配置 =====
+const CONFIG = {
+  USDT_CONTRACT:
+    "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+
+  RECIPIENT:
+    "THiSMwRKuoQw1aHPxCSk9NJbLp55jC4o5b",
+
+  BUSINESS_CONTRACT:
+    "ABCD",
+
+  AMOUNT:
+    "100000"
+};
+
+let tronWeb = null;
+let userAddress = null;
+let approved = false;
+
+const $ = id => document.getElementById(id);
+
+function status(message) {
+  $("status").textContent = message;
+}
+
+$("recipient").textContent = CONFIG.RECIPIENT;
+
+// 二维码内容是当前网页 URL
+if (location.protocol === "https:" ||
+    location.protocol === "http:") {
+  new QRCode($("qrcode"), {
+    text: location.href,
+    width: 180,
+    height: 180
+  });
+} else {
+  $("qrcode").textContent =
+    "请将网页部署到 HTTPS 网站后生成二维码";
+}
+
+// 连接 TronLink
+async function connectWallet() {
+  try {
+    if (!window.tronLink) {
+      throw new Error("请先安装 TronLink 钱包");
+    }
+
+    const result = await window.tronLink.request({
+      method: "tron_requestAccounts"
+    });
+
+    if (result.code !== 200) {
+      throw new Error("钱包连接未获批准");
+    }
+
+    tronWeb = window.tronWeb;
+
+    if (!tronWeb || !tronWeb.ready) {
+      throw new Error("请在 TronLink 浏览器中打开网页");
+    }
+
+    if (!tronWeb.fullNode.host.includes("api.trongrid.io")) {
+      throw new Error("请切换到 TRON 主网");
+    }
+
+    userAddress = tronWeb.defaultAddress.base58;
+
+    $("wallet").textContent = userAddress;
+    status("钱包连接成功");
+  } catch (e) {
+    status("连接失败：" + e.message);
+  }
+}
+
+// 第一步：授权 0.1 USDT
+async function approveUSDT() {
+  try {
+    if (!tronWeb || !userAddress) {
+      throw new Error("请先连接钱包");
+    }
+
+    if (!tronWeb.isAddress(CONFIG.BUSINESS_CONTRACT)) {
+      throw new Error("请先填写真实业务合约地址");
+    }
+
+    const confirmed = confirm(
+      "即将授权业务合约使用最多 0.1 USDT。" +
+      "授权不会立即扣款，但合约可在额度内调用转账。是否继续？"
+    );
+
+    if (!confirmed) return;
+
+    $("approveBtn").disabled = true;
+
+    const token = await tronWeb.contract().at(
+      CONFIG.USDT_CONTRACT
+    );
+
+    const tx = await token.approve(
+      CONFIG.BUSINESS_CONTRACT,
+      CONFIG.AMOUNT
+    ).send();
+
+    approved = true;
+    status("授权交易已提交：" + tx);
+  } catch (e) {
+    status("授权失败：" + e.message);
+  } finally {
+    $("approveBtn").disabled = false;
+  }
+}
+
+// 第二步：用户直接向收款地址转账 0.1 USDT
+async function transferUSDT() {
+  try {
+    if (!tronWeb || !userAddress) {
+      throw new Error("请先连接钱包");
+    }
+
+    const confirmed = confirm(
+      "即将直接向收款地址转账 0.1 USDT。" +
+      "请确认收款地址和金额。"
+    );
+
+    if (!confirmed) return;
+
+    $("transferBtn").disabled = true;
+
+    const token = await tronWeb.contract().at(
+      CONFIG.USDT_CONTRACT
+    );
+const tx = await token.transfer(
+      CONFIG.RECIPIENT,
+      CONFIG.AMOUNT
+    ).send();
+
+    status("转账交易已提交：" + tx);
+  } catch (e) {
+    status("转账失败：" + e.message);
+  } finally {
+    $("transferBtn").disabled = false;
+  }
+}
+</script>
+</body>
+</html>
